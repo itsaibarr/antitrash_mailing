@@ -1,65 +1,137 @@
-import Image from "next/image";
+"use client";
+import { useState } from "react";
+
+type ImagePayload = {
+    data: string;
+    name?: string;
+    type?: string;
+};
+
+type Payload = {
+    message: string;
+    image?: ImagePayload;
+};
 
 export default function Home() {
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
-  );
+    const [message, setMessage] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [image, setImage] = useState<File | null>(null);
+    const [imageData, setImageData] = useState<string | null>(null);
+
+    const onFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0] ?? null;
+        setImage(file);
+        if (!file) {
+            setImageData(null);
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+            const result = reader.result as string;
+            // data:<type>;base64,<data>
+            const base = result.split(",")[1];
+            setImageData(base);
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const send = async () => {
+        setLoading(true);
+        try {
+            // ограничение размера — 4 МБ
+            const MAX_BYTES = 4 * 1024 * 1024;
+            if (image && image.size > MAX_BYTES) {
+                alert("Файл слишком большой. Максимум 4 МБ.");
+                setLoading(false);
+                return;
+            }
+
+            const payload: Payload = { message };
+            if (imageData) {
+                payload.image = {
+                    data: imageData,
+                    name: image?.name,
+                    type: image?.type,
+                };
+            }
+
+            const res = await fetch("/api/send", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+
+            type ResponseBody = { error?: string; message?: string; failures?: Array<{ id: string | number; error: string }>; };
+
+            let body: unknown = null;
+            try {
+                body = await res.json();
+            } catch {
+                // no json
+            }
+
+            console.log("send response:", res.status, body);
+
+            if (!res.ok) {
+                const b = body as ResponseBody | null;
+                let errMsg = b?.error || b?.message || `Статус ${res.status}`;
+                if (b?.failures) {
+                    errMsg += "\nFailures: " + JSON.stringify(b.failures);
+                }
+                alert("❌ Ошибка при отправке: " + errMsg);
+            } else {
+                alert("✅ Рассылка выполнена!");
+            }
+        } catch (err: unknown) {
+            console.error(err);
+            alert("❌ Ошибка при отправке: " + String(err));
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <main className="flex flex-col items-center justify-center min-h-screen p-4 sm:p-8 gap-6">
+            <div className="w-full max-w-3xl">
+                <h1 className="text-2xl sm:text-3xl font-bold text-[#820000] text-center">AntiTrash Astana</h1>
+                <h2 className="text-base sm:text-lg font-semibold text-center mt-2">
+                    Привет! Напиши сообщение, которым хочешь поделиться с другими.
+                    <br className="hidden sm:inline" />
+                    Пожалуйста, будь уважителен — не спамь и используй бота только по назначению.
+                </h2>
+
+                <div className="mt-6 flex flex-col gap-4">
+                    <textarea
+                        className="border p-3 w-full min-h-[6rem] sm:min-h-[8rem] rounded-md resize-vertical"
+                        placeholder="Введите сообщение"
+                        value={message}
+                        onChange={(e) => setMessage(e.target.value)}
+                    />
+
+                    <label className="flex flex-col items-start gap-2">
+                        <input type="file" accept="image/*" onChange={onFileChange} />
+                        {imageData && (
+                            // small preview — responsive width
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                                src={`data:${image?.type};base64,${imageData}`}
+                                alt="preview"
+                                className="w-full sm:w-48 h-auto rounded-md object-contain mt-2"
+                            />
+                        )}
+                    </label>
+
+                    <div className="flex w-full justify-center">
+                        <button
+                            className="w-full sm:w-auto bg-[#820000] text-white px-6 py-3 rounded-lg font-semibold hover:bg-[#5a0000]"
+                            disabled={loading}
+                            onClick={send}
+                        >
+                            {loading ? "Отправка..." : "Отправить всем"}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    );
 }

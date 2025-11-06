@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
-import fs from "fs/promises";
+import { loadChatList } from "../../../lib/chatList";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
@@ -10,9 +10,8 @@ export async function POST(req: Request) {
         const { message, image } = await req.json();
         if (!message && !image) return NextResponse.json({ error: "Пустое сообщение и нет изображения" }, { status: 400 });
 
-        // читаем список chatID
-        const file = await fs.readFile("chatList.json", "utf-8");
-        const users = JSON.parse(file);
+        // читаем список chatID безопасно через lib
+        const users = await loadChatList();
 
         // если передано изображение — подготовим Buffer
         let imgBuffer: Buffer | null = null;
@@ -42,8 +41,9 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json({ success: true });
-    } catch (err) {
-        console.error("Ошибка на сервере:", err);
-        return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });
+    } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("Ошибка на сервере:", msg);
+        return NextResponse.json({ error: `Ошибка сервера: ${msg}` }, { status: 500 });
     }
 }

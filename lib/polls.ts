@@ -16,7 +16,13 @@ export type PollData = {
     [pollId: string]: PollAnswer[];
 };
 
-const getPollsPath = () => path.join("/tmp", "polls.json");
+const getPollsPath = () => {
+    if (process.env.VERCEL) {
+        // На Vercel сохраняем в постоянном месте
+        return path.join(process.cwd(), "data", "polls.json");
+    }
+    return path.join("/tmp", "polls.json");
+};
 
 export async function loadPolls(): Promise<PollData> {
     const p = getPollsPath();

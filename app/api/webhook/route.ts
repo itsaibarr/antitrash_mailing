@@ -18,11 +18,20 @@ export async function POST(req: Request) {
         const body = await req.text();
         const secret = req.headers.get("x-telegram-bot-api-secret-token");
 
+        console.log("🔗 Webhook received:", {
+            hasSecret: !!secret,
+            bodyLength: body.length,
+            timestamp: new Date().toISOString()
+        });
+
         if (secret && !verifyTelegramUpdate(body, secret)) {
+            console.error("❌ Invalid webhook secret token");
             return NextResponse.json({ error: "Invalid secret" }, { status: 403 });
         }
 
         const update = JSON.parse(body);
+
+        console.log("📨 Update type:", Object.keys(update).filter(key => update[key] !== undefined));
 
         // Handle poll_answer
         if (update.poll_answer) {

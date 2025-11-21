@@ -2,7 +2,24 @@ import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
-const webhookUrl = process.env.WEBHOOK_URL!;
+
+// Динамическое определение webhook URL
+function getWebhookUrl(): string {
+    // Если явно задан в переменных окружения, используем его
+    if (process.env.WEBHOOK_URL) {
+        return process.env.WEBHOOK_URL;
+    }
+
+    // Для Vercel используем VERCEL_URL
+    if (process.env.VERCEL_URL) {
+        return `https://${process.env.VERCEL_URL}/api/webhook`;
+    }
+
+    // Fallback для локальной разработки
+    return process.env.WEBHOOK_URL || 'http://localhost:3000/api/webhook';
+}
+
+const webhookUrl = getWebhookUrl();
 
 export async function POST(req: Request) {
     try {

@@ -5,7 +5,17 @@ const getProjectPathCandidates = () => [
     path.join(process.cwd(), "chatList.json"),
     path.join(process.cwd(), "chatlist.json"),
 ];
-const getTmpPath = () => path.join("/tmp", "chatList.json");
+
+// Для Vercel используем постоянное место, для локальной разработки - /tmp
+const getStoragePath = () => {
+    if (process.env.VERCEL) {
+        // На Vercel сохраняем в корне проекта (если возможно)
+        return path.join(process.cwd(), "data", "chatList.json");
+    }
+    return path.join("/tmp", "chatList.json");
+};
+
+const getTmpPath = () => getStoragePath();
 
 export async function loadChatList(): Promise<Array<string | number>> {
     // Сначала пробуем оба варианта в каталоге проекта (возможно файл был закоммичен)

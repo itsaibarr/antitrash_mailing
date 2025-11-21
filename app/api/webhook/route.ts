@@ -51,23 +51,38 @@ export async function POST(req: Request) {
             const data = callbackQuery.data;
             const message = callbackQuery.message;
 
+            console.log("🔘 Callback query received:", {
+                userId: user.id,
+                username: user.username,
+                data: data,
+                hasMessage: !!message,
+                messageText: message?.text,
+                messageType: message ? Object.keys(message).filter(k => message[k] !== undefined) : []
+            });
+
             // Create user tag
             const userTag = user.username ? `@${user.username}` : `${user.first_name || 'Unknown'} ${user.last_name || ''}`.trim();
 
-            // Extract full question from message text, fallback to callback_data
+            // Extract question and button text from callback_data or message text
             let question = 'Вопрос';
             let buttonText = data;
 
-            // Try to get full question from message text first
-            if (message && message.text) {
-                question = message.text;
-            } else if (data.includes('|')) {
-                // Fallback to truncated question from callback_data
+            // For callback buttons, data contains "question|button" format
+            if (data.includes('|')) {
                 const parts = data.split('|');
                 if (parts.length >= 2) {
                     question = parts[0];
                     buttonText = parts[1];
+                    console.log("📝 Using question and button from callback_data:", { question, buttonText });
                 }
+            } else {
+                // For other button types, try to get question from message text
+                if (message && message.text) {
+                    question = message.text;
+                    console.log("📝 Using question from message text:", question);
+                }
+                console.log("📝 Using buttonText from data:", data);
+                buttonText = data;
             }
 
             // Always send notification to the group (use the group chat ID from chatlist)
@@ -78,17 +93,39 @@ export async function POST(req: Request) {
                     `👤 ${userTag} (ID: ${user.id})\n` +
                     `🔘 Нажал кнопку: "${buttonText}"`;
                 await bot.telegram.sendMessage(groupChatId, groupMessage);
-                console.log("Enhanced button press logged to group:", { userId: user.id, question, buttonText, sourceChatId: message?.chat?.id });
+                console.log("✅ Button press logged to group:", { userId: user.id, question, buttonText, sourceChatId: message?.chat?.id });
             } catch (groupError) {
-                console.error("Failed to send button press to group:", groupError);
+                console.error("❌ Failed to send button press to group:", {
+                    error: groupError,
+                    groupChatId,
+                    question,
+                    buttonText,
+                    userId: user.id
+                });
+
+                // Try to send error message to log chat instead
+                try {
+                    const logBot = new Telegraf(logBotToken);
+                    const errorMessage = `❌ Ошибка отправки в группу:\n${JSON.stringify({
+                        error: String(groupError),
+                        groupChatId,
+                        question,
+                        buttonText,
+                        userId: user.id
+                    }, null, 2)}`;
+                    await logBot.telegram.sendMessage(logChatId, errorMessage);
+                } catch (logError) {
+                    console.error("❌ Failed to send error to log chat:", logError);
+                }
             }
 
             // Answer the callback query to remove loading state
             try {
                 const bot = new Telegraf(token);
                 await bot.telegram.answerCbQuery(callbackQuery.id);
+                console.log("✅ Callback query answered");
             } catch (answerError) {
-                console.error("Failed to answer callback query:", answerError);
+                console.error("❌ Failed to answer callback query:", answerError);
             }
         }
 

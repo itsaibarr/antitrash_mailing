@@ -15,8 +15,13 @@ function getWebhookUrl(): string {
         return `https://${process.env.VERCEL_URL}/api/webhook`;
     }
 
-    // Fallback для локальной разработки
-    return process.env.WEBHOOK_URL || 'http://localhost:3000/api/webhook';
+    // Для локальной разработки используем localhost
+    if (process.env.NODE_ENV !== 'production') {
+        return 'http://localhost:3000/api/webhook';
+    }
+
+    // Fallback
+    return 'http://localhost:3000/api/webhook';
 }
 
 const webhookUrl = getWebhookUrl();

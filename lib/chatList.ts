@@ -15,8 +15,8 @@ export async function loadChatList(): Promise<Array<string | number>> {
             const raw = await fs.readFile(p, "utf8");
             const parsed = JSON.parse(raw);
             return Array.isArray(parsed) ? parsed : [];
-        } catch (err: any) {
-            if (err && err.code === "ENOENT") {
+        } catch (err: unknown) {
+            if (err instanceof Error && 'code' in err && err.code === "ENOENT") {
                 continue; // пробуем следующий
             }
             // если ошибка парсинга или иная — пробуем следующий источник
@@ -30,8 +30,8 @@ export async function loadChatList(): Promise<Array<string | number>> {
         const raw = await fs.readFile(tmpPath, "utf8");
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : [];
-    } catch (err: any) {
-        if (err && err.code === "ENOENT") {
+    } catch (err: unknown) {
+        if (err instanceof Error && 'code' in err && err.code === "ENOENT") {
             // если файла нет — создаём пустой в /tmp и возвращаем пустой список
             try {
                 await saveChatList([]);

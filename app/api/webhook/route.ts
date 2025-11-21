@@ -129,30 +129,22 @@ export async function POST(req: Request) {
             }
         }
 
-        // Handle messages (for getting chat IDs) - now logs to the same group
+        // Handle messages (for getting chat IDs) - disabled to prevent spam
         if (update.message) {
             const message = update.message;
             const chat = message.chat;
             const user = message.from;
 
-            // Log chat ID for groups and supergroups directly in the group
-            if (chat.type === 'group' || chat.type === 'supergroup') {
-                const userTag = user.username ? `@${user.username}` : `${user.first_name || 'Unknown'} ${user.last_name || ''}`.trim();
-
-                try {
-                    const bot = new Telegraf(token);
-                    const logMessage = `📢 Chat ID группы получен!\n` +
-                        `🆔 **Chat ID: ${chat.id}**\n` +
-                        `💬 Группа: ${chat.title || 'Без названия'}\n` +
-                        `📝 Тип: ${chat.type}\n` +
-                        `👤 Отправлено: ${userTag}`;
-
-                    await bot.telegram.sendMessage(chat.id, logMessage);
-                    console.log("Group chat ID logged in group:", { chatId: chat.id, userId: user.id, chatType: chat.type });
-                } catch (logError) {
-                    console.error("Failed to log group message:", logError);
-                }
+            // Only log chat ID for private messages or specific commands
+            if (chat.type === 'private') {
+                console.log("Private message received:", {
+                    chatId: chat.id,
+                    userId: user.id,
+                    username: user.username,
+                    text: message.text
+                });
             }
+            // Group chat ID logging disabled to prevent spam
         }
 
         return NextResponse.json({ ok: true });

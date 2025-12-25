@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
 import { loadChatList } from "../../../../lib/chatList";
+import { createLogicalPoll, addPollMessage } from "../../../../lib/polls";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
@@ -20,9 +21,12 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Вопрос и минимум 2 варианта ответа обязательны" }, { status: 400 });
         }
 
+        // Создать логический опрос
+        const logicalPoll = await createLogicalPoll(question, options, is_anonymous, allows_multiple_answers);
+
         const users = await loadChatList();
 
-        const results: { chatId: string | number; messageId?: number; pollId?: string }[] = [];
+        const results: { chatId: string | number; messageId?: number; pollId?: string; logicalPollId: string }[] = [];
 
         for (const id of users) {
             try {
@@ -30,20 +34,32 @@ export async function POST(req: Request) {
                     is_anonymous,
                     allows_multiple_answers,
                 });
+
+                // Сохранить связь message_id + poll_id
+                if (pollMessage.poll?.id) {
+                    await addPollMessage({
+                        logical_poll_id: logicalPoll.id,
+                        telegram_poll_id: pollMessage.poll.id,
+                        chat_id: id,
+                        message_id: pollMessage.message_id,
+                    });
+                }
+
                 results.push({
                     chatId: id,
                     messageId: pollMessage.message_id,
                     pollId: pollMessage.poll?.id,
+                    logicalPollId: logicalPoll.id,
                 });
                 console.log("✅ Опрос отправлен:", id);
                 await new Promise((r) => setTimeout(r, 1000));
             } catch (err: unknown) {
                 console.error(`❌ Ошибка при отправке опроса ${id}:`, err);
-                results.push({ chatId: id });
+                results.push({ chatId: id, logicalPollId: logicalPoll.id });
             }
         }
 
-        return NextResponse.json({ success: true, results });
+        return NextResponse.json({ success: true, logicalPollId: logicalPoll.id, results });
     } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
         console.error("Ошибка на сервере:", msg);

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { addPollAnswer, type PollAnswer, findLogicalPollIdByTelegramPollId, addPollResponse, hasUserAnsweredPoll, getUserPollResponse, loadLogicalPolls } from "../../../lib/polls";
-import { addSubscriber } from "../../../lib/db";
+import { addSubscriber, initDatabase } from "../../../lib/db";
 import { Telegraf } from "telegraf";
 import crypto from "crypto";
 
@@ -16,6 +16,9 @@ function verifyTelegramUpdate(body: string, secret: string): boolean {
 
 export async function POST(req: Request) {
     try {
+        // Initialize database tables if needed
+        await initDatabase();
+
         const body = await req.text();
         const secret = req.headers.get("x-telegram-bot-api-secret-token");
 

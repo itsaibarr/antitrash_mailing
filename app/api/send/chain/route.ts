@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
-import { getActiveSubscribers, deactivateSubscriber } from "../../../../lib/db";
+import { getActiveSubscribers, deactivateSubscriber, initDatabase } from "../../../../lib/db";
 import { createLogicalPoll, addPollMessage } from "../../../../lib/polls";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
@@ -33,6 +33,9 @@ type Message = {
 
 export async function POST(req: Request) {
     try {
+        // Initialize database tables if needed
+        await initDatabase();
+
         console.log("🔄 Начинаем отправку цепочки сообщений");
 
         const { messages }: { messages: Message[] } = await req.json();

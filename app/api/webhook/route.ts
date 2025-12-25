@@ -226,13 +226,29 @@ export async function POST(req: Request) {
                     }
                 }
 
-                // Answer the callback query to remove loading state
+                // Answer the callback query with success message
                 try {
                     const bot = new Telegraf(token);
-                    await bot.telegram.answerCbQuery(callbackQuery.id);
+                    await bot.telegram.answerCbQuery(callbackQuery.id, "Спасибо за отправку!", {
+                        show_alert: false
+                    });
                     console.log("✅ Callback query answered");
                 } catch (answerError) {
                     console.error("❌ Failed to answer callback query:", answerError);
+                }
+
+                // Edit the message to remove buttons and show thank you
+                if (message) {
+                    try {
+                        const bot = new Telegraf(token);
+                        const newText = `${message.text}\n\n✅ Спасибо за отправку!`;
+                        await bot.telegram.editMessageText(message.chat.id, message.message_id, undefined, newText, {
+                            reply_markup: { inline_keyboard: [] } // Remove buttons
+                        });
+                        console.log("✅ Message edited: buttons removed, thank you added");
+                    } catch (editError) {
+                        console.error("❌ Failed to edit message:", editError);
+                    }
                 }
             }
         }

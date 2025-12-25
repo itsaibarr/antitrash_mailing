@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
-import { getActiveSubscribers, deactivateSubscriber } from "../../../lib/db";
+import { getActiveSubscribers, deactivateSubscriber, initDatabase } from "../../../lib/db";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
 export async function POST(req: Request) {
     try {
+        // Initialize database tables if needed
+        await initDatabase();
+
         const bot = new Telegraf(token);
         const { message, image } = await req.json();
         if (!message && !image) return NextResponse.json({ error: "Пустое сообщение и нет изображения" }, { status: 400 });

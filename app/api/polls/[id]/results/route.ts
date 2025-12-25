@@ -4,13 +4,13 @@ import { initDatabase } from "../../../../../lib/db";
 
 export async function GET(
     req: Request,
-    { params }: { params: { id: string } }
+    { params }: { params: Promise<{ id: string }> }
 ) {
     try {
         // Initialize database tables if needed
         await initDatabase();
 
-        const pollId = params.id;
+        const { id: pollId } = await params;
         const results = await getPollResults(pollId);
 
         if (!results) {

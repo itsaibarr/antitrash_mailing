@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
-import { loadChatList } from "../../../../lib/chatList";
+import { getActiveSubscribers, deactivateSubscriber } from "../../../../lib/db";
 import { createLogicalPoll, addPollMessage } from "../../../../lib/polls";
 import { initDatabase } from "../../../../lib/db";
 
@@ -28,7 +28,13 @@ export async function POST(req: Request) {
         // Создать логический опрос
         const logicalPoll = await createLogicalPoll(question, options, is_anonymous, allows_multiple_answers);
 
-        const users = await loadChatList();
+        // Получаем список активных подписчиков из базы данных
+        const subscribers = await getActiveSubscribers();
+        const users = subscribers.map(s => s.chat_id);
+
+        if (users.length === 0) {
+            return NextResponse.json({ error: "Нет активных подписчиков" }, { status: 400 });
+        }
 
         const results: { chatId: string | number; messageId?: number; pollId?: string; logicalPollId: string }[] = [];
 
@@ -63,7 +69,23 @@ export async function POST(req: Request) {
                 console.log("✅ Опрос отправлен:", id);
                 await new Promise((r) => setTimeout(r, 1000));
             } catch (err: unknown) {
-                console.error(`❌ Ошибка при отправке опроса ${id}:`, err);
+                const errorMsg = err instanceof Error ? err.message : String(err);
+                console.error(`❌ Ошибка при отправке опроса ${id}:`, errorMsg);
+
+                // Handle specific Telegram errors
+                if (errorMsg.includes('chat not found') ||
+                    errorMsg.includes('bot was blocked') ||
+                    errorMsg.includes('user is deactivated') ||
+                    errorMsg.includes('chat was deactivated')) {
+                    // Deactivate subscriber if chat is unavailable
+                    try {
+                        await deactivateSubscriber(id);
+                        console.log(`🚫 Подписчик деактивирован: ${id}`);
+                    } catch (deactivateError) {
+                        console.error(`❌ Не удалось деактивировать подписчика ${id}:`, deactivateError);
+                    }
+                }
+
                 results.push({ chatId: id, logicalPollId: logicalPoll.id });
             }
         }

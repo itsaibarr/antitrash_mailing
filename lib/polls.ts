@@ -74,19 +74,19 @@ export type PollData = {
 };
 
 const getPollsPath = () => {
-    return path.join(process.cwd(), "data", "polls.json");
+    return path.join("/var/task", "data", "polls.json");
 };
 
 const getLogicalPollsPath = () => {
-    return path.join(process.cwd(), "data", "logical_polls.json");
+    return path.join("/var/task", "data", "logical_polls.json");
 };
 
 const getPollMessagesPath = () => {
-    return path.join(process.cwd(), "data", "poll_messages.json");
+    return path.join("/var/task", "data", "poll_messages.json");
 };
 
 const getPollResponsesPath = () => {
-    return path.join(process.cwd(), "data", "poll_responses.json");
+    return path.join("/var/task", "data", "poll_responses.json");
 };
 
 export async function loadPolls(): Promise<PollData> {

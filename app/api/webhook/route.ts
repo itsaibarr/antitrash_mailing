@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { addPollAnswer, type PollAnswer, findLogicalPollIdByTelegramPollId, addPollResponse, hasUserAnsweredPoll, getUserPollResponse, loadLogicalPolls } from "../../../lib/polls";
+import { addSubscriber } from "../../../lib/db";
 import { Telegraf } from "telegraf";
 import crypto from "crypto";
 
@@ -253,22 +254,44 @@ export async function POST(req: Request) {
             }
         }
 
-        // Handle messages (for getting chat IDs) - disabled to prevent spam
+        // Handle messages
         if (update.message) {
             const message = update.message;
             const chat = message.chat;
             const user = message.from;
+            const text = message.text;
 
-            // Only log chat ID for private messages or specific commands
+            // Handle /start command in private chats
+            if (chat.type === 'private' && text === '/start') {
+                try {
+                    // Add user to subscribers
+                    await addSubscriber(chat.id, {
+                        username: user.username,
+                        first_name: user.first_name,
+                        last_name: user.last_name
+                    });
+
+                    // Send welcome message
+                    const bot = new Telegraf(token);
+                    const welcomeMessage = `👋 Добро пожаловать!\n\n` +
+                        `Вы успешно подписались на рассылку. Теперь вы будете получать все важные обновления и опросы.`;
+
+                    await bot.telegram.sendMessage(chat.id, welcomeMessage);
+                    console.log(`✅ User subscribed: ${chat.id} (${user.username || user.first_name})`);
+                } catch (error) {
+                    console.error("❌ Failed to handle /start command:", error);
+                }
+            }
+
+            // Log other private messages for debugging
             if (chat.type === 'private') {
                 console.log("Private message received:", {
                     chatId: chat.id,
                     userId: user.id,
                     username: user.username,
-                    text: message.text
+                    text: text
                 });
             }
-            // Group chat ID logging disabled to prevent spam
         }
 
         return NextResponse.json({ ok: true });

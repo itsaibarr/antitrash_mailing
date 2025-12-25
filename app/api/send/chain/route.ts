@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
-import { loadChatList } from "../../../../lib/chatList";
+import { getActiveSubscribers, deactivateSubscriber } from "../../../../lib/db";
 import { createLogicalPoll, addPollMessage } from "../../../../lib/polls";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
@@ -44,12 +44,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Нет сообщений для отправки" }, { status: 400 });
         }
 
-        // Загружаем список пользователей
-        const users = await loadChatList();
-        console.log(`👥 Загружено ${users.length} пользователей:`, users);
+        // Получаем список активных подписчиков из базы данных
+        const subscribers = await getActiveSubscribers();
+        const users = subscribers.map(s => s.chat_id);
+        console.log(`👥 Загружено ${users.length} подписчиков из базы данных`);
 
         if (users.length === 0) {
-            return NextResponse.json({ error: "Список пользователей пуст" }, { status: 400 });
+            return NextResponse.json({ error: "Нет активных подписчиков" }, { status: 400 });
         }
 
         // Проверяем токен
@@ -159,6 +160,20 @@ export async function POST(req: Request) {
                     } catch (err: unknown) {
                         const errorMsg = err instanceof Error ? err.message : String(err);
                         console.error(`❌ Ошибка при отправке сообщения ${i + 1} пользователю ${userId}:`, errorMsg);
+
+                        // Handle specific Telegram errors
+                        if (errorMsg.includes('chat not found') ||
+                            errorMsg.includes('bot was blocked') ||
+                            errorMsg.includes('user is deactivated') ||
+                            errorMsg.includes('chat was deactivated')) {
+                            // Deactivate subscriber if chat is unavailable
+                            try {
+                                await deactivateSubscriber(userId);
+                                console.log(`🚫 Подписчик деактивирован: ${userId}`);
+                            } catch (deactivateError) {
+                                console.error(`❌ Не удалось деактивировать подписчика ${userId}:`, deactivateError);
+                            }
+                        }
 
                         results.push({
                             chatId: userId,

@@ -74,32 +74,19 @@ export type PollData = {
 };
 
 const getPollsPath = () => {
-    if (process.env.VERCEL) {
-        // На Vercel сохраняем в постоянном месте
-        return path.join(process.cwd(), "data", "polls.json");
-    }
-    return path.join("/tmp", "polls.json");
+    return path.join(process.cwd(), "data", "polls.json");
 };
 
 const getLogicalPollsPath = () => {
-    if (process.env.VERCEL) {
-        return path.join(process.cwd(), "data", "logical_polls.json");
-    }
-    return path.join("/tmp", "logical_polls.json");
+    return path.join(process.cwd(), "data", "logical_polls.json");
 };
 
 const getPollMessagesPath = () => {
-    if (process.env.VERCEL) {
-        return path.join(process.cwd(), "data", "poll_messages.json");
-    }
-    return path.join("/tmp", "poll_messages.json");
+    return path.join(process.cwd(), "data", "poll_messages.json");
 };
 
 const getPollResponsesPath = () => {
-    if (process.env.VERCEL) {
-        return path.join(process.cwd(), "data", "poll_responses.json");
-    }
-    return path.join("/tmp", "poll_responses.json");
+    return path.join(process.cwd(), "data", "poll_responses.json");
 };
 
 export async function loadPolls(): Promise<PollData> {

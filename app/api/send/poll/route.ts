@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
 import { loadChatList } from "../../../../lib/chatList";
 import { createLogicalPoll, addPollMessage } from "../../../../lib/polls";
+import { initDatabase } from "../../../../lib/db";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
@@ -14,6 +15,9 @@ type PollOptions = {
 
 export async function POST(req: Request) {
     try {
+        // Initialize database tables if needed
+        await initDatabase();
+
         const bot = new Telegraf(token);
         const { question, options, is_anonymous = true, allows_multiple_answers = false }: PollOptions = await req.json();
 

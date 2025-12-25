@@ -87,7 +87,7 @@ export async function createLogicalPoll(question: string, options: string[], is_
 
     await sql`
         INSERT INTO logical_polls (id, question, options, is_anonymous, allows_multiple_answers, created_at)
-        VALUES (${id}, ${question}, ${options}, ${is_anonymous}, ${allows_multiple_answers}, ${created_at})
+        VALUES (${id}, ${question}, ARRAY[${options.map(o => `'${o.replace(/'/g, "''")}'`).join(',')}]::text[], ${is_anonymous}, ${allows_multiple_answers}, ${created_at})
     `;
 
     return {
@@ -156,9 +156,12 @@ export async function findLogicalPollIdByTelegramPollId(telegram_poll_id: string
 export async function addPollResponse(response: Omit<PollResponse, 'id' | 'responded_at'>): Promise<void> {
     const responded_at = new Date().toISOString();
 
+    const optionIndicesSql = `ARRAY[${response.option_indices.join(',')}]::integer[]`;
+    const optionTextsSql = response.option_texts ? `ARRAY[${response.option_texts.map(o => `'${o.replace(/'/g, "''")}'`).join(',')}]::text[]` : 'NULL';
+
     await sql`
         INSERT INTO poll_responses (logical_poll_id, telegram_user_id, option_indices, option_texts, responded_at)
-        VALUES (${response.logical_poll_id}, ${response.telegram_user_id}, ${response.option_indices}, ${response.option_texts || null}, ${responded_at})
+        VALUES (${response.logical_poll_id}, ${response.telegram_user_id}, ${(sql as any).unsafe(optionIndicesSql)}, ${(sql as any).unsafe(optionTextsSql)}, ${responded_at})
         ON CONFLICT (logical_poll_id, telegram_user_id)
         DO UPDATE SET
             option_indices = EXCLUDED.option_indices,

@@ -30,25 +30,30 @@ export async function POST(req: Request) {
 
         for (const id of users) {
             try {
-                const pollMessage = await bot.telegram.sendPoll(id, question, options, {
-                    is_anonymous,
-                    allows_multiple_answers,
+                // Создать inline клавиатуру для опроса
+                const inlineKeyboard = options.map((option, index) => [{
+                    text: option,
+                    callback_data: `poll:${logicalPoll.id}:${index}`
+                }]);
+
+                const pollMessage = await bot.telegram.sendMessage(id, question, {
+                    reply_markup: {
+                        inline_keyboard: inlineKeyboard
+                    }
                 });
 
-                // Сохранить связь message_id + poll_id
-                if (pollMessage.poll?.id) {
-                    await addPollMessage({
-                        logical_poll_id: logicalPoll.id,
-                        telegram_poll_id: pollMessage.poll.id,
-                        chat_id: id,
-                        message_id: pollMessage.message_id,
-                    });
-                }
+                // Сохранить связь message_id (без poll_id, поскольку это кнопки)
+                await addPollMessage({
+                    logical_poll_id: logicalPoll.id,
+                    telegram_poll_id: `button_poll_${logicalPoll.id}`, // Фиктивный ID для кнопок
+                    chat_id: id,
+                    message_id: pollMessage.message_id,
+                });
 
                 results.push({
                     chatId: id,
                     messageId: pollMessage.message_id,
-                    pollId: pollMessage.poll?.id,
+                    pollId: `button_poll_${logicalPoll.id}`,
                     logicalPollId: logicalPoll.id,
                 });
                 console.log("✅ Опрос отправлен:", id);

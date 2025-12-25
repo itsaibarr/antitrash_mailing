@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
 import { loadChatList } from "../../../../lib/chatList";
+import { createLogicalPoll, addPollMessage } from "../../../../lib/polls";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
@@ -27,6 +28,7 @@ type Message = {
     }>;
     buttonText?: string;
     replyTo?: string;
+    logical_poll_id?: string;
 };
 
 export async function POST(req: Request) {
@@ -58,6 +60,15 @@ export async function POST(req: Request) {
 
         const bot = new Telegraf(token);
 
+        // Обработать polls: создать logical polls
+        const processedMessages = await Promise.all(messages.map(async (msg) => {
+            if (msg.type === 'poll' && msg.poll) {
+                const logicalPoll = await createLogicalPoll(msg.poll.question, msg.poll.options, msg.poll.is_anonymous, msg.poll.allows_multiple_answers);
+                return { ...msg, logical_poll_id: logicalPoll.id };
+            }
+            return msg;
+        }));
+
         // Начинаем асинхронную отправку
         const sendPromise = (async () => {
             const results: Array<{
@@ -68,8 +79,8 @@ export async function POST(req: Request) {
             }> = [];
 
             for (const userId of users) {
-                for (let i = 0; i < messages.length; i++) {
-                    const msg = messages[i];
+                for (let i = 0; i < processedMessages.length; i++) {
+                    const msg = processedMessages[i];
                     try {
                         if (msg.type === 'text') {
                             await bot.telegram.sendMessage(userId, msg.content);
@@ -92,9 +103,24 @@ export async function POST(req: Request) {
                                 caption: msg.caption || undefined
                             });
                         } else if (msg.type === 'poll' && msg.poll) {
-                            await bot.telegram.sendPoll(userId, msg.poll.question, msg.poll.options, {
-                                is_anonymous: msg.poll.is_anonymous,
-                                allows_multiple_answers: msg.poll.allows_multiple_answers,
+                            // Создать inline клавиатуру для опроса
+                            const inlineKeyboard = msg.poll.options.map((option, index) => [{
+                                text: option,
+                                callback_data: `poll:${msg.logical_poll_id!}:${index}`
+                            }]);
+
+                            const pollMessage = await bot.telegram.sendMessage(userId, msg.poll.question, {
+                                reply_markup: {
+                                    inline_keyboard: inlineKeyboard
+                                }
+                            });
+
+                            // Сохранить связь
+                            await addPollMessage({
+                                logical_poll_id: msg.logical_poll_id!,
+                                telegram_poll_id: `button_poll_${msg.logical_poll_id!}`,
+                                chat_id: userId,
+                                message_id: pollMessage.message_id,
                             });
                         } else if (msg.type === 'buttons' && msg.buttons) {
                             // Для кнопок создаем inline клавиатуру с расширенными callback_data

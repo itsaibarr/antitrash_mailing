@@ -1,36 +1,61 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Antitrash Mailing Bot
+
+A Next.js application for managing Telegram mailing lists, creating polls, and sending logical chains of messages.
+
+## Features
+
+- **Mass Mailing**: Send text, images, videos, and files to all subscribers.
+- **Polls**: Create logical polls with anonymous options and multiple answers.
+- **Chains**: Send sequences of messages with logic.
+- **Automatic Cleanup**: Automatically deactivates users who block the bot or delete their account.
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+- Node.js 18+
+- PostgreSQL database (e.g., Vercel Postgres, Neon)
+- Telegram Bot Token
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Installation
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/yourusername/antitrash-mailing.git
+   cd antitrash-mailing
+   ```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
 
-## Learn More
+3. Configure Environment Variables:
+   Copy `.env.example` (or create `.env`) and add your secrets:
+   ```env
+   TELEGRAM_BOT_TOKEN=your_bot_token
+   DATABASE_URL=your_postgres_url
+   LOG_BOT_TOKEN=optional_logging_bot_token
+   LOG_CHAT_ID=optional_logging_chat_id
+   ```
 
-To learn more about Next.js, take a look at the following resources:
+4. Run the development server:
+   ```bash
+   npm run dev
+   ```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Deployment
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+This project is optimized for deployment on [Vercel](https://vercel.com).
 
-## Deploy on Vercel
+1. Push your code to GitHub.
+2. Import the project in Vercel.
+3. Add the Environment Variables in the Vercel dashboard.
+4. Deploy!
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Project Structure
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/api/`: API routes for sending messages and handling webhooks.
+- `lib/`: Shared utilities (`db.ts`, `telegramHelpers.ts`, `webhookLogic.ts`, `polls.ts`).
+- `lib/telegramHelpers.ts`: Centralized logic for safe message sending and error handling.
+

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
 import { getActiveSubscribers, deactivateSubscriber, initDatabase } from "../../../../lib/db";
 import { createLogicalPoll, addPollMessage } from "../../../../lib/polls";
+import { safeTelegramSend } from "../../../../lib/telegramHelpers";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
@@ -85,22 +86,23 @@ export async function POST(req: Request) {
             for (const userId of users) {
                 for (let i = 0; i < processedMessages.length; i++) {
                     const msg = processedMessages[i];
-                    try {
+
+                    const result = await safeTelegramSend(userId, async () => {
                         if (msg.type === 'text') {
-                            await bot.telegram.sendMessage(userId, msg.content);
+                            return await bot.telegram.sendMessage(userId, msg.content);
                         } else if (msg.type === 'image' && msg.media) {
                             const imgBuffer = Buffer.from(msg.media.data, "base64");
-                            await bot.telegram.sendPhoto(userId, { source: imgBuffer }, {
+                            return await bot.telegram.sendPhoto(userId, { source: imgBuffer }, {
                                 caption: msg.caption || undefined
                             });
                         } else if (msg.type === 'video' && msg.media) {
                             const videoBuffer = Buffer.from(msg.media.data, "base64");
-                            await bot.telegram.sendVideo(userId, { source: videoBuffer }, {
+                            return await bot.telegram.sendVideo(userId, { source: videoBuffer }, {
                                 caption: msg.caption || undefined
                             });
                         } else if (msg.type === 'file' && msg.media) {
                             const fileBuffer = Buffer.from(msg.media.data, "base64");
-                            await bot.telegram.sendDocument(userId, {
+                            return await bot.telegram.sendDocument(userId, {
                                 source: fileBuffer,
                                 filename: msg.media.name
                             }, {
@@ -119,13 +121,10 @@ export async function POST(req: Request) {
                                 }
                             });
 
-                            // Сохранить связь
-                            await addPollMessage({
-                                logical_poll_id: msg.logical_poll_id!,
-                                telegram_poll_id: `button_poll_${msg.logical_poll_id!}`,
-                                chat_id: userId,
-                                message_id: pollMessage.message_id,
-                            });
+                            // Return message for later use in result handling if needed, 
+                            // though safeTelegramSend handles the result return.
+                            // We need to store the message_id for saving to DB.
+                            return pollMessage;
                         } else if (msg.type === 'buttons' && msg.buttons) {
                             // Для кнопок создаем inline клавиатуру с расширенными callback_data
                             const inlineKeyboard = [msg.buttons.map(btn => {
@@ -142,48 +141,49 @@ export async function POST(req: Request) {
                                 }
                             })];
 
-                            await bot.telegram.sendMessage(userId, msg.buttonText || msg.content || 'Выберите действие:', {
+                            return await bot.telegram.sendMessage(userId, msg.buttonText || msg.content || 'Выберите действие:', {
                                 reply_markup: {
                                     inline_keyboard: inlineKeyboard
                                 }
                             });
                         }
+                    });
 
+                    if (result.success) {
+                        if (msg.type === 'poll' && msg.poll && result.messageId) {
+                            // Сохранить связь
+                            try {
+                                await addPollMessage({
+                                    logical_poll_id: msg.logical_poll_id!,
+                                    telegram_poll_id: `button_poll_${msg.logical_poll_id!}`,
+                                    chat_id: userId,
+                                    message_id: result.messageId,
+                                });
+                            } catch (e) {
+                                console.error("Error saving poll message", e);
+                            }
+                        }
+
+                        console.log(`✅ Сообщение ${i + 1} отправлено пользователю ${userId}`);
                         results.push({
                             chatId: userId,
                             messageIndex: i,
                             success: true
                         });
 
-                        console.log(`✅ Сообщение ${i + 1} отправлено пользователю ${userId}`);
-
                         // Задержка между сообщениями
                         await new Promise(r => setTimeout(r, 1000));
 
-                    } catch (err: unknown) {
-                        const errorMsg = err instanceof Error ? err.message : String(err);
-                        console.error(`❌ Ошибка при отправке сообщения ${i + 1} пользователю ${userId}:`, errorMsg);
-
-                        // Handle specific Telegram errors
-                        if (errorMsg.includes('chat not found') ||
-                            errorMsg.includes('bot was blocked') ||
-                            errorMsg.includes('user is deactivated') ||
-                            errorMsg.includes('chat was deactivated')) {
-                            // Deactivate subscriber if chat is unavailable
-                            try {
-                                await deactivateSubscriber(userId);
-                                console.log(`🚫 Подписчик деактивирован: ${userId}`);
-                            } catch (deactivateError) {
-                                console.error(`❌ Не удалось деактивировать подписчика ${userId}:`, deactivateError);
-                            }
-                        }
-
+                    } else {
                         results.push({
                             chatId: userId,
                             messageIndex: i,
                             success: false,
-                            error: errorMsg
+                            error: result.error
                         });
+                        // Break user loop on error? Original code didn't break explicitly but went to next iteration.
+                        // We continue to next message for same user? Or stop?
+                        // Original code caught error and continued loop.
                     }
                 }
 

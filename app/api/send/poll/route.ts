@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
-import { getActiveSubscribers, deactivateSubscriber } from "../../../../lib/db";
+import { getActiveSubscribers, initDatabase } from "../../../../lib/db";
 import { createLogicalPoll, addPollMessage } from "../../../../lib/polls";
-import { initDatabase } from "../../../../lib/db";
+import { safeTelegramSend } from "../../../../lib/telegramHelpers";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
@@ -15,7 +15,6 @@ type PollOptions = {
 
 export async function POST(req: Request) {
     try {
-        // Initialize database tables if needed
         await initDatabase();
 
         const bot = new Telegraf(token);
@@ -25,10 +24,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Вопрос и минимум 2 варианта ответа обязательны" }, { status: 400 });
         }
 
-        // Создать логический опрос
         const logicalPoll = await createLogicalPoll(question, options, is_anonymous, allows_multiple_answers);
-
-        // Получаем список активных подписчиков из базы данных
         const subscribers = await getActiveSubscribers();
         const users = subscribers.map(s => s.chat_id);
 
@@ -39,55 +35,38 @@ export async function POST(req: Request) {
         const results: { chatId: string | number; messageId?: number; pollId?: string; logicalPollId: string }[] = [];
 
         for (const id of users) {
-            try {
-                // Создать inline клавиатуру для опроса
-                const inlineKeyboard = options.map((option, index) => [{
-                    text: option,
-                    callback_data: `poll:${logicalPoll.id}:${index}`
-                }]);
+            const inlineKeyboard = options.map((option, index) => [{
+                text: option,
+                callback_data: `poll:${logicalPoll.id}:${index}`
+            }]);
 
-                const pollMessage = await bot.telegram.sendMessage(id, question, {
+            const result = await safeTelegramSend(id, async () => {
+                return await bot.telegram.sendMessage(id, question, {
                     reply_markup: {
                         inline_keyboard: inlineKeyboard
                     }
                 });
+            });
 
-                // Сохранить связь message_id (без poll_id, поскольку это кнопки)
+            if (result.success && result.messageId) {
                 await addPollMessage({
                     logical_poll_id: logicalPoll.id,
-                    telegram_poll_id: `button_poll_${logicalPoll.id}`, // Фиктивный ID для кнопок
+                    telegram_poll_id: `button_poll_${logicalPoll.id}`,
                     chat_id: id,
-                    message_id: pollMessage.message_id,
+                    message_id: result.messageId,
                 });
 
                 results.push({
                     chatId: id,
-                    messageId: pollMessage.message_id,
+                    messageId: result.messageId,
                     pollId: `button_poll_${logicalPoll.id}`,
                     logicalPollId: logicalPoll.id,
                 });
                 console.log("✅ Опрос отправлен:", id);
-                await new Promise((r) => setTimeout(r, 1000));
-            } catch (err: unknown) {
-                const errorMsg = err instanceof Error ? err.message : String(err);
-                console.error(`❌ Ошибка при отправке опроса ${id}:`, errorMsg);
-
-                // Handle specific Telegram errors
-                if (errorMsg.includes('chat not found') ||
-                    errorMsg.includes('bot was blocked') ||
-                    errorMsg.includes('user is deactivated') ||
-                    errorMsg.includes('chat was deactivated')) {
-                    // Deactivate subscriber if chat is unavailable
-                    try {
-                        await deactivateSubscriber(id);
-                        console.log(`🚫 Подписчик деактивирован: ${id}`);
-                    } catch (deactivateError) {
-                        console.error(`❌ Не удалось деактивировать подписчика ${id}:`, deactivateError);
-                    }
-                }
-
+            } else {
                 results.push({ chatId: id, logicalPollId: logicalPoll.id });
             }
+            await new Promise((r) => setTimeout(r, 1000));
         }
 
         return NextResponse.json({ success: true, logicalPollId: logicalPoll.id, results });

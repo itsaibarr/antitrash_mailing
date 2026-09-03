@@ -1,5 +1,7 @@
 # Antitrash Mailing Bot
 
+Status: one-off, November 2025 to February 2026, not maintained. Live: https://antitrash-mailing.vercel.app
+
 A Next.js application for managing Telegram mailing lists, creating polls, and sending logical chains of messages.
 
 ## Features

@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { migrateFromJsonFile, initDatabase } from "../../../lib/db";
+import { checkAdminAuth } from "../../../lib/adminAuth";
 
 export async function POST(req: Request) {
+    const guard = checkAdminAuth(req);
+    if (guard) return guard;
     try {
         // Initialize database tables if needed
         await initDatabase();

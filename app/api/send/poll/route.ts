@@ -3,6 +3,7 @@ import { Telegraf } from "telegraf";
 import { getActiveSubscribers, initDatabase } from "../../../../lib/db";
 import { createLogicalPoll, addPollMessage } from "../../../../lib/polls";
 import { safeTelegramSend } from "../../../../lib/telegramHelpers";
+import { checkAdminAuth } from "../../../../lib/adminAuth";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
@@ -14,6 +15,8 @@ type PollOptions = {
 };
 
 export async function POST(req: Request) {
+    const guard = checkAdminAuth(req);
+    if (guard) return guard;
     try {
         await initDatabase();
 

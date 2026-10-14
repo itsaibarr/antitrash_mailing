@@ -13,6 +13,15 @@ const token = process.env.TELEGRAM_BOT_TOKEN!;
 const logBotToken = process.env.LOG_BOT_TOKEN!;
 const logChatId = process.env.LOG_CHAT_ID!;
 
+// Fail closed: never guess a destination for group notifications.
+function getLogGroupChatId(): string {
+    const groupId = process.env.LOG_GROUP_CHAT_ID;
+    if (!groupId) {
+        throw new Error("LOG_GROUP_CHAT_ID is not set — refusing to send group notification");
+    }
+    return groupId;
+}
+
 export async function handlePollAnswer(update: any) {
     if (!update.poll_answer) return;
 
@@ -106,7 +115,7 @@ async function handlePollCallback(callbackQuery: any, user: any, data: string, m
                 const userTag = user.username ? `@${user.username}` : `${user.first_name || 'Unknown'} ${user.last_name || ''}`.trim();
 
                 // Send notification to mentors
-                const groupChatId = "-1003090304051";
+                const groupChatId = getLogGroupChatId();
                 const question = poll ? poll.question : 'Опрос';
                 const bot = new Telegraf(botToken);
                 const groupMessage = `❓ **${question}**\n\n` +
@@ -170,8 +179,9 @@ async function handleButtonCallback(callbackQuery: any, user: any, data: string,
         buttonText = data;
     }
 
-    const groupChatId = "-1003090304051";
+    let groupChatId: string | undefined;
     try {
+        groupChatId = getLogGroupChatId();
         const bot = new Telegraf(botToken);
         const groupMessage = `❓ **${question}**\n\n` +
             `👤 ${userTag} (ID: ${user.id})\n` +

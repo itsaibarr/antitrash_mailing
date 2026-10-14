@@ -1,63 +1,43 @@
-# Antitrash Mailing Bot
+# Antitrash mailing bot
 
-Status: one-off, November 2025 to February 2026, not maintained. Live: https://antitrash-mailing.vercel.app
+A Telegram mailing admin for the AntiTrash Astana channel. I built it as a one-off between late 2025 and early 2026 and no longer maintain it. It sends broadcasts, runs polls, and chains messages into sequences from a small Next.js admin page.
 
-A Next.js application for managing Telegram mailing lists, creating polls, and sending logical chains of messages.
+## What it does
 
-## Features
+People subscribe through the bot. The admin page composes a message, a poll, or a chain of messages, and the app fans it out to every subscriber. Anyone who blocks the bot gets deactivated on the next send. Poll answers land in Postgres.
 
-- **Mass Mailing**: Send text, images, videos, and files to all subscribers.
-- **Polls**: Create logical polls with anonymous options and multiple answers.
-- **Chains**: Send sequences of messages with logic.
-- **Automatic Cleanup**: Automatically deactivates users who block the bot or delete their account.
+## Run it yourself
 
-## Getting Started
+You need Node 18+, a Postgres database, and a bot token from BotFather. Neon has a free tier that fits this app.
 
-### Prerequisites
+```
+npm install
+cp .env.example .env.local   # fill in your tokens
+npm run dev
+```
 
-- Node.js 18+
-- PostgreSQL database (e.g., Vercel Postgres, Neon)
-- Telegram Bot Token
+Create the tables, then point Telegram at your deployment:
 
-### Installation
+```
+curl -X POST localhost:3000/api/migrate
+curl -X POST localhost:3000/api/webhook/setup
+```
 
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/antitrash-mailing.git
-   cd antitrash-mailing
-   ```
+All variables live in `.env.example`. `ADMIN_SECRET` is optional. Set it and the send, migrate, and webhook-setup routes require it as a bearer token. Leave it unset and the routes stay open, which is how the original deployment ran. Do not run it that way on a public URL.
 
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
+## Layout
 
-3. Configure Environment Variables:
-   Copy `.env.example` (or create `.env`) and add your secrets:
-   ```env
-   TELEGRAM_BOT_TOKEN=your_bot_token
-   DATABASE_URL=your_postgres_url
-   LOG_BOT_TOKEN=optional_logging_bot_token
-   LOG_CHAT_ID=optional_logging_chat_id
-   ```
+| Path | What lives there |
+| --- | --- |
+| `app/page.tsx` | admin console: message, poll, and chain builders |
+| `app/api/send/*` | broadcast, poll, and chain fan-out |
+| `app/api/webhook/*` | Telegram updates and webhook setup |
+| `app/api/polls/*` | poll reads and per-respondent results |
+| `app/api/migrate` | creates tables, migrates the legacy JSON store |
+| `lib/db.ts`, `lib/polls.ts` | Postgres access via `@vercel/postgres` |
+| `lib/webhookLogic.ts` | subscribe, poll answers, forwards to the log group |
+| `lib/adminAuth.ts` | opt-in bearer guard for the write routes |
 
-4. Run the development server:
-   ```bash
-   npm run dev
-   ```
+## Status
 
-### Deployment
-
-This project is optimized for deployment on [Vercel](https://vercel.com).
-
-1. Push your code to GitHub.
-2. Import the project in Vercel.
-3. Add the Environment Variables in the Vercel dashboard.
-4. Deploy!
-
-## Project Structure
-
-- `app/api/`: API routes for sending messages and handling webhooks.
-- `lib/`: Shared utilities (`db.ts`, `telegramHelpers.ts`, `webhookLogic.ts`, `polls.ts`).
-- `lib/telegramHelpers.ts`: Centralized logic for safe message sending and error handling.
-
+Unmaintained one-off. The last Vercel deployment still serves poll reads. Sending needs the owner's bot token and database, so treat this as readable history, not a service.

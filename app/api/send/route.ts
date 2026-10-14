@@ -2,10 +2,13 @@ import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
 import { getActiveSubscribers, initDatabase } from "../../../lib/db";
 import { safeTelegramSend } from "../../../lib/telegramHelpers";
+import { checkAdminAuth } from "../../../lib/adminAuth";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
 export async function POST(req: Request) {
+    const guard = checkAdminAuth(req);
+    if (guard) return guard;
     try {
         await initDatabase();
 

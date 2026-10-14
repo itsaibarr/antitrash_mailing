@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Telegraf } from "telegraf";
+import { checkAdminAuth } from "../../../../lib/adminAuth";
 
 const token = process.env.TELEGRAM_BOT_TOKEN!;
 
@@ -27,6 +28,8 @@ function getWebhookUrl(): string {
 const webhookUrl = getWebhookUrl();
 
 export async function POST(req: Request) {
+    const guard = checkAdminAuth(req);
+    if (guard) return guard;
     try {
         console.log("🔧 Начинаем настройку webhook");
 
@@ -68,6 +71,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+    const guard = checkAdminAuth(req);
+    if (guard) return guard;
     try {
         console.log("🔧 Удаляем webhook");
 
